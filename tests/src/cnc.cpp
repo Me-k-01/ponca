@@ -100,6 +100,34 @@ void testBasicFunctionalities(const KdTree<typename Fit::DataPoint>& tree) {
     }
 }
 
+
+template<typename Fit1, typename Fit2, typename Tree>
+void testCompareFitOnSphere(bool _bAddPositionNoise = false, bool _bAddNormalNoise = false) {
+    typedef typename Fit1::DataPoint DataPoint;
+    typedef typename DataPoint::Scalar Scalar;
+    typedef typename DataPoint::VectorType VectorType;
+
+    // Sphere analysis params
+    int nbPoints = Eigen::internal::random<int>(100, 1000);
+    Scalar radius = Eigen::internal::random<Scalar>(1,10);
+    VectorType center = VectorType::Random() * Eigen::internal::random<Scalar>(1, 10000);
+    Scalar analysisScale = Scalar(10.) * std::sqrt(Scalar(4. * M_PI) * radius * radius / nbPoints);
+
+    // Generate sampled sphere
+    vector<DataPoint> vectorPoints(nbPoints);
+    for(unsigned int i = 0; i < vectorPoints.size(); ++i) {
+        vectorPoints[i] = getPointOnSphere<DataPoint>(radius, center, _bAddPositionNoise, _bAddNormalNoise);
+    }
+
+    // Test for each point if the results are equivalent
+#pragma omp parallel for
+    for(int i = 0; i < int(vectorPoints.size()); ++i) {
+        Fit1 fit;
+        fit.setWeightFunc({vectorPoints[i].pos(), analysisScale});
+        fit.compute(vectorPoints);
+    }
+}
+
 template<typename Scalar, int Dim>
 void callSubTests() {
     //! [SpecializedPointType]
