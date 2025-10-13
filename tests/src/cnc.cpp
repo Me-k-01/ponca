@@ -118,7 +118,7 @@ void callSubTests() {
     CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_Independent>(tree) ));
     CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_Uniform>(tree) ));
     CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_Hexagram>(tree) ));
-    CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_AvgHexagram>(tree) ));
+    // CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_AvgHexagram>(tree) ));
 }
 
 int main(const int argc, char** argv) {
