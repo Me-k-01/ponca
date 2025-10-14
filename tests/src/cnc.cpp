@@ -131,8 +131,8 @@ void testCompareFit(const KdTree<typename Fit1::DataPoint>& tree, typename Fit1:
         Scalar eps = testEpsilon<Scalar>();
 
         // Compare Fit1 with Fit2
-        // VERIFY(((fit1.kMean() - fit2.kMean()) < eps));
-        // VERIFY(((fit1.GaussianCurvature() - fit2.GaussianCurvature()) < eps));
+        VERIFY(((fit1.kMean() - fit2.kMean()) < eps));
+        VERIFY(((fit1.GaussianCurvature() - fit2.GaussianCurvature()) < eps));
     }
 }
 
@@ -164,9 +164,9 @@ void callSubTests() {
 
     // Compare with ASO
     CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_Independent>(tree, analysisScale) ));
-    // CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_Uniform>(tree, analysisScale) ));
-    // CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_Hexagram>(tree, analysisScale) ));
-    // CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_AvgHexagram>(tree, analysisScale) ));
+    CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_Uniform>(tree, analysisScale) ));
+    CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_Hexagram>(tree, analysisScale) ));
+    CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_AvgHexagram>(tree, analysisScale) ));
 }
 
 int main(const int argc, char** argv) {
