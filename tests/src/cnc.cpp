@@ -23,6 +23,7 @@ This Source Code Form is subject to the terms of the Mozilla Public
 #include "Ponca/src/Fitting/curvature.h"
 #include "Ponca/src/Fitting/curvatureEstimation.h"
 #include "Ponca/src/Fitting/mlsSphereFitDer.h"
+#include "Ponca/src/Fitting/weightKernel.h"
 
 
 using namespace std;
@@ -142,7 +143,7 @@ void callSubTests() {
     typedef PointPositionNormal<Scalar, Dim> Point;
     typedef typename Point::VectorType VectorType;
     //! [SpecializedPointType]
-    using SmoothWeightFunc   = Ponca::DistWeightFunc<Point, Ponca::SmoothWeightKernel<Scalar> >;
+    using SmoothWeightFunc   = Ponca::DistWeightFunc<Point, SmoothWeightKernel<Scalar> >;
     using FitASODiff = BasketDiff<
             Basket<Point, SmoothWeightFunc, Ponca::OrientedSphereFit>,
             DiffType::FitSpaceDer,
