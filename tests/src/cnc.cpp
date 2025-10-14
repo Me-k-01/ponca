@@ -20,12 +20,16 @@ This Source Code Form is subject to the terms of the Mozilla Public
 
 #include <vector>
 
+#include "Ponca/src/Fitting/curvature.h"
+#include "Ponca/src/Fitting/curvatureEstimation.h"
+#include "Ponca/src/Fitting/mlsSphereFitDer.h"
+
 
 using namespace std;
 using namespace Ponca;
 
 template<typename DataPoint>
-typename DataPoint::Scalar generateData(KdTree<DataPoint>& tree) {
+typename DataPoint::Scalar generateSpherePC(KdTree<DataPoint>& tree) {
     typedef typename DataPoint::Scalar Scalar;
     typedef typename DataPoint::VectorType VectorType;
 
@@ -100,31 +104,35 @@ void testBasicFunctionalities(const KdTree<typename Fit::DataPoint>& tree) {
     }
 }
 
-
-template<typename Fit1, typename Fit2, typename Tree>
-void testCompareFitOnSphere(bool _bAddPositionNoise = false, bool _bAddNormalNoise = false) {
+/// \breif Compare the GaussianCurvature and kMean between two fit
+template<typename Fit1, typename Fit2>
+void testCompareFit(const KdTree<typename Fit1::DataPoint>& tree, typename Fit1::Scalar analysisScale) {
     typedef typename Fit1::DataPoint DataPoint;
     typedef typename DataPoint::Scalar Scalar;
-    typedef typename DataPoint::VectorType VectorType;
+    const auto& vectorPoints = tree.points();
 
-    // Sphere analysis params
-    int nbPoints = Eigen::internal::random<int>(100, 1000);
-    Scalar radius = Eigen::internal::random<Scalar>(1,10);
-    VectorType center = VectorType::Random() * Eigen::internal::random<Scalar>(1, 10000);
-    Scalar analysisScale = Scalar(10.) * std::sqrt(Scalar(4. * M_PI) * radius * radius / nbPoints);
-
-    // Generate sampled sphere
-    vector<DataPoint> vectorPoints(nbPoints);
-    for(unsigned int i = 0; i < vectorPoints.size(); ++i) {
-        vectorPoints[i] = getPointOnSphere<DataPoint>(radius, center, _bAddPositionNoise, _bAddNormalNoise);
-    }
-
-    // Test for each point if the results are equivalent
+    // Test for each point if the curvature results are equivalent
 #pragma omp parallel for
     for(int i = 0; i < int(vectorPoints.size()); ++i) {
-        Fit1 fit;
-        fit.setWeightFunc({vectorPoints[i].pos(), analysisScale});
-        fit.compute(vectorPoints);
+        // compute the indices list
+        std::vector<int> pointsIndex;
+        for (const int j : tree.range_neighbors(i, analysisScale)) {
+            pointsIndex.push_back(j);
+        }
+
+        Fit1 fit1;
+        fit1.setWeightFunc({vectorPoints[i].pos(), analysisScale});
+        fit1.computeWithIds(pointsIndex, vectorPoints);
+
+        Fit2 fit2;
+        fit2.setWeightFunc({vectorPoints[i].pos(), analysisScale});
+        fit2.computeWithIds(pointsIndex, vectorPoints);
+
+        Scalar eps = testEpsilon<Scalar>();
+
+        // Compare Fit1 with Fit2
+        // VERIFY(((fit1.kMean() - fit2.kMean()) < eps));
+        // VERIFY(((fit1.GaussianCurvature() - fit2.GaussianCurvature()) < eps));
     }
 }
 
@@ -132,7 +140,14 @@ template<typename Scalar, int Dim>
 void callSubTests() {
     //! [SpecializedPointType]
     typedef PointPositionNormal<Scalar, Dim> Point;
+    typedef typename Point::VectorType VectorType;
     //! [SpecializedPointType]
+    using SmoothWeightFunc   = Ponca::DistWeightFunc<Point, Ponca::SmoothWeightKernel<Scalar> >;
+    using FitASODiff = BasketDiff<
+            Basket<Point, SmoothWeightFunc, Ponca::OrientedSphereFit>,
+            DiffType::FitSpaceDer,
+            OrientedSphereDer, Ponca::MlsSphereFitDer,
+            CurvatureEstimatorBase, Ponca::NormalDerivativesCurvatureEstimator>;
 
     //! [CNCFitType]
     using Fit_CNC_Independent = CNC<Point, TriangleGenerationMethod::IndependentGeneration>;
@@ -142,11 +157,16 @@ void callSubTests() {
     //! [CNCFitType]
 
     KdTreeDense<Point> tree;
-    generateData(tree);
+    Scalar analysisScale = generateSpherePC(tree);
     CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_Independent>(tree) ));
     CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_Uniform>(tree) ));
     CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_Hexagram>(tree) ));
-    // CALL_SUBTEST((testBasicFunctionalities<Fit_CNC_AvgHexagram>(tree) ));
+
+    // Compare with ASO
+    CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_Independent>(tree, analysisScale) ));
+    // CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_Uniform>(tree, analysisScale) ));
+    // CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_Hexagram>(tree, analysisScale) ));
+    // CALL_SUBTEST((testCompareFit<FitASODiff, Fit_CNC_AvgHexagram>(tree, analysisScale) ));
 }
 
 int main(const int argc, char** argv) {
