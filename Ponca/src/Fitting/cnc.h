@@ -174,7 +174,8 @@ public:
         return !(this == &other);
     }
 
-    bool isApprox(const CNC& other, const Scalar& epsilon = Eigen::NumTraits<Scalar>::dummy_precision()) const {
+    template<typename Fit>
+    bool isApprox(const Fit& other, const Scalar& epsilon = Eigen::NumTraits<Scalar>::dummy_precision()) const {
         // Simply compare the kMean and kGauss results
         return std::abs(kMean()  - other.kMean())  < epsilon
             && std::abs(GaussianCurvature() - other.GaussianCurvature()) < epsilon;
