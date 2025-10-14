@@ -125,7 +125,7 @@ void testCompareFit(const KdTree<typename Fit1::DataPoint>& tree, typename Fit1:
         fit1.computeWithIds(pointsIndex, vectorPoints);
 
         Fit2 fit2;
-        fit2.setWeightFunc({vectorPoints[i].pos(), analysisScale});
+        fit2.setEvalPoint(vectorPoints[i]);
         fit2.computeWithIds(pointsIndex, vectorPoints);
 
         Scalar eps = testEpsilon<Scalar>();
