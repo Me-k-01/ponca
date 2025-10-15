@@ -140,10 +140,10 @@ public:
 
     /*! \brief Compute function to iterate over a subset of samples in a PointContainer  */
     /*! Add neighbors stored in a PointContainer and sampled using indices stored in ids.*/
-    /*! \tparam IndexContainer An STL-like container storing the indices of the neighbors */
+    /*! \tparam IndexRange An STL-like container storing the indices of the neighbors */
     /*! \tparam PointContainer An STL-like container storing the points */
-    template <typename IndexContainer, typename PointContainer>
-    PONCA_MULTIARCH inline FIT_RESULT computeWithIds( const IndexContainer& ids, const PointContainer& points );
+    template <typename IndexRange, typename PointContainer>
+    PONCA_MULTIARCH inline FIT_RESULT computeWithIds( const IndexRange& ids, const PointContainer& points );
 
     PONCA_MULTIARCH inline int getNumTriangles() const {
         return _nb_vt;
