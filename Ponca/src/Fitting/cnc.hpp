@@ -91,21 +91,13 @@ namespace Ponca::internal {
             VectorType a;
             a.setZero();
 
-            int iSource = -1;
             Scalar avg_d = Scalar(0);
 
             for ( int index : indicesGetter ) {
                 auto p = points[ index ];
                 avg_d += ( p.pos() - c ).norm();
                 a     += p.normal();
-
-                // if avg_d == 0 then it is the evalPoint
-                if ( iSource == -1 && p.pos() == c  ) {
-                    iSource = index;
-                }
             }
-
-            if ( iSource == -1 ) throw std::runtime_error("Eval point not found in the neighborhood during the HexagramGeneration.");
 
             a     /= a.norm();
             n      = ( Scalar(1) - avg_normal ) * n + avg_normal * a;
@@ -130,7 +122,7 @@ namespace Ponca::internal {
             std::array<int, 6> indices;
 
             for ( int i = 0 ; i < 6 ; i++ ) {
-                indices    [ i ] = iSource;
+                indices    [ i ] = -1;
                 _distance2 [ i ] = avg_d * avg_d;
                 _targets   [ i ] = avg_d * ( u * std::cos( i * M_PI / 3.0 ) + v * std::sin( i * M_PI / 3.0 ) );
             }
@@ -138,7 +130,6 @@ namespace Ponca::internal {
             // Compute closest points.
             for ( int index : indicesGetter ) {
                 VectorType p = points[ index ].pos();
-                if ( p == c ) continue;
                 const VectorType d = p - c;
 
                 for ( int j = 0 ; j < 6 ; j++ ){
@@ -149,8 +140,12 @@ namespace Ponca::internal {
                     }
                 }
             }
-            triangles.push_back(internal::Triangle<P>(points[indices[0]], points[indices[2]], points[indices[4]]));
-            triangles.push_back(internal::Triangle<P>(points[indices[1]], points[indices[3]], points[indices[5]]));
+#define GET_POINT(I) indices[I] < 0 ? _evalPointPos : points[indices[I]].pos()
+#define GET_NORMAL(I) indices[I] < 0 ? _evalPointNormal : points[indices[I]].normal()
+            triangles.push_back(internal::Triangle<P>({GET_POINT(0) , GET_POINT(2) , GET_POINT(4)}, {GET_NORMAL(0) , GET_NORMAL(2) , GET_NORMAL(4)}));
+            triangles.push_back(internal::Triangle<P>({GET_POINT(1), GET_POINT(3), GET_POINT(5)}, {GET_NORMAL(1), GET_NORMAL(3), GET_NORMAL(5)}));
+#undef GET_POINT
+#undef GET_NORMAL
 
             return 2;
         }
