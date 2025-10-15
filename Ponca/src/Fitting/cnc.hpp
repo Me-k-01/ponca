@@ -66,27 +66,33 @@ namespace Ponca::internal {
             return nb_vt;
         }
     };
-#define FUNC_COMPUTE_COSIN(COSIN)                                  \
-    template<typename Scalar>                                      \
-    constexpr std::array<Scalar, 6> compute_##COSIN##_values() {   \
-        std::array<Scalar, 6> result = {};                         \
-        for (int i = 0; i < 6; ++i) {                              \
-            result[i] = std::COSIN(i * M_PI / 3.0);                \
-        }                                                          \
-        return result;                                             \
+
+    template<typename P>
+    struct HexagramBase {
+        using Scalar = typename P::Scalar;
+    protected:
+#define FUNC_COMPUTE_COSIN(COSIN)                                         \
+    template<typename Scalar>                                             \
+    static constexpr std::array<Scalar, 6> compute_##COSIN##_values() {   \
+        std::array<Scalar, 6> result = {};                                \
+        for (int i = 0; i < 6; ++i) {                                     \
+            result[i] = std::COSIN(i * M_PI / 3.0);                       \
+        }                                                                 \
+        return result;                                                    \
     }
 
 FUNC_COMPUTE_COSIN(cos)
 FUNC_COMPUTE_COSIN(sin)
 #undef FUNC_COMPUTE_COSIN
-
+    public:
+        static constexpr auto m_cos = compute_cos_values<Scalar>();
+        static constexpr auto m_sin = compute_sin_values<Scalar>();
+    };
     /// Generates the triangles used by the CNC Fit using HexagramGeneration
     template <typename P>
-    struct TriangleGenerator<HexagramGeneration, P> {
+    struct TriangleGenerator<HexagramGeneration, P> : public HexagramBase<P> {
         using VectorType = typename P::VectorType;
         using Scalar = typename P::Scalar;
-        static constexpr auto _cos = compute_cos_values<Scalar>();
-        static constexpr auto _sin = compute_sin_values<Scalar>();
 
         template <typename PointContainer, typename IndicesGetter>
         static int generate(
@@ -138,7 +144,7 @@ FUNC_COMPUTE_COSIN(sin)
             for ( int i = 0 ; i < 6 ; i++ ) {
                 indices    [ i ] = -1;
                 _distance2 [ i ] = avg_d * avg_d;
-                _targets   [ i ] = avg_d * ( u * _cos[i] + v * _sin[i] );
+                _targets   [ i ] = avg_d * ( u * HexagramBase<P>::m_cos[i] + v * HexagramBase<P>::m_sin[i] );
             }
 
             // Compute closest points.
@@ -167,11 +173,9 @@ FUNC_COMPUTE_COSIN(sin)
 
     /// Generates the triangles used by the CNC Fit using AvgHexagramGeneration
     template <typename P>
-    struct TriangleGenerator<AvgHexagramGeneration, P> {
+    struct TriangleGenerator<AvgHexagramGeneration, P> : public HexagramBase<P> {
         using VectorType = typename P::VectorType;
         using Scalar = typename P::Scalar;
-        static constexpr auto _cos = compute_cos_values<Scalar>();
-        static constexpr auto _sin = compute_sin_values<Scalar>();
 
         template <typename PointContainer, typename IndicesGetter>
         static int generate(
@@ -215,7 +219,7 @@ FUNC_COMPUTE_COSIN(sin)
             v /= v.norm();
 
             for (int i = 0 ; i < 6 ; i++ ) {
-                _targets[ i ]          = avg_d * ( u * _cos[i] + v * _sin[i] );
+                _targets[ i ]          = avg_d * ( u * HexagramBase<P>::m_cos[i] + v * HexagramBase<P>::m_sin[i] );
                 array_avg_normals[ i ] = VectorType::Zero();
                 array_avg_points[ i ]  = VectorType::Zero();
             }
