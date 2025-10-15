@@ -67,10 +67,51 @@ namespace Ponca::internal {
         }
     };
 
+    /// Generates the triangles used by the CNC Fit using IndependentGeneration
+    template <typename P>
+    struct TriangleGenerator<IndependentGeneration, P> {
+    private:
+        static constexpr int maxTriangles {100};
+    public:
+        using VectorType = typename P::VectorType;
+        using Scalar = typename P::Scalar;
+
+        template <typename PointContainer, typename IndicesGetter>
+        static int generate(
+            const PointContainer& points,
+            const IndicesGetter& indicesGetter,
+            const VectorType& /*_evalPointPos*/, const VectorType& /*_evalPointNormal*/,
+            std::vector<Triangle<P>>& triangles
+        ) {
+            int nb_vt = 0; // Number of valid generated triangles
+
+            // Makes a new array to shuffle
+            std::vector<int> indices(indicesGetter.size());
+            for (int i = 0; i < indicesGetter.size() ; ++i)
+                indices[i] = indicesGetter[i];
+
+            // Shuffles the neighbors
+            std::random_device rd;
+            std::mt19937 rg(rd());
+            std::shuffle(indices.begin(), indices.end(), rg);
+
+            // Compute the triangles
+            triangles.clear();
+            for (const int max_triangles = std::min(maxTriangles, static_cast<int>(indicesGetter.size()) / 3); nb_vt < max_triangles-2; nb_vt++) {
+                int i1 = indices[nb_vt];
+                int i2 = indices[nb_vt+1];
+                int i3 = indices[nb_vt+2];
+                triangles.push_back(internal::Triangle<P>(points[i1], points[i2], points[i3]));
+            }
+            return nb_vt;
+        }
+    };
+
     template<typename P>
     struct HexagramBase {
         using Scalar = typename P::Scalar;
     protected:
+
 #define FUNC_COMPUTE_COSIN(COSIN)                                         \
     template<typename Scalar>                                             \
     static constexpr std::array<Scalar, 6> compute_##COSIN##_values() {   \
@@ -80,10 +121,10 @@ namespace Ponca::internal {
         }                                                                 \
         return result;                                                    \
     }
-
-FUNC_COMPUTE_COSIN(cos)
-FUNC_COMPUTE_COSIN(sin)
+        FUNC_COMPUTE_COSIN(cos)
+        FUNC_COMPUTE_COSIN(sin)
 #undef FUNC_COMPUTE_COSIN
+
     public:
         static constexpr auto m_cos = compute_cos_values<Scalar>();
         static constexpr auto m_sin = compute_sin_values<Scalar>();
@@ -259,46 +300,6 @@ FUNC_COMPUTE_COSIN(sin)
                 { array_avg_normals[1], array_avg_normals[3], array_avg_normals[5] }
             ));
             return 2;
-        }
-    };
-
-    /// Generates the triangles used by the CNC Fit using IndependentGeneration
-    template <typename P>
-    struct TriangleGenerator<IndependentGeneration, P> {
-    private:
-        static constexpr int maxTriangles {100};
-    public:
-        using VectorType = typename P::VectorType;
-        using Scalar = typename P::Scalar;
-
-        template <typename PointContainer, typename IndicesGetter>
-        static int generate(
-            const PointContainer& points,
-            const IndicesGetter& indicesGetter,
-            const VectorType& /*_evalPointPos*/, const VectorType& /*_evalPointNormal*/,
-            std::vector<Triangle<P>>& triangles
-        ) {
-            int nb_vt = 0; // Number of valid generated triangles
-
-            // Makes a new array to shuffle
-            std::vector<int> indices(indicesGetter.size());
-            for (int i = 0; i < indicesGetter.size() ; ++i)
-                indices[i] = indicesGetter[i];
-
-            // Shuffles the neighbors
-            std::random_device rd;
-            std::mt19937 rg(rd());
-            std::shuffle(indices.begin(), indices.end(), rg);
-
-            // Compute the triangles
-            triangles.clear();
-            for (const int max_triangles = std::min(maxTriangles, static_cast<int>(indicesGetter.size()) / 3); nb_vt < max_triangles-2; nb_vt++) {
-                int i1 = indices[nb_vt];
-                int i2 = indices[nb_vt+1];
-                int i3 = indices[nb_vt+2];
-                triangles.push_back(internal::Triangle<P>(points[i1], points[i2], points[i3]));
-            }
-            return nb_vt;
         }
     };
 } // namespace Ponca::internal
