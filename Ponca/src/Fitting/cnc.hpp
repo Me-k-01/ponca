@@ -103,6 +103,8 @@ namespace Ponca::internal {
                 }
             }
 
+            if ( iSource == -1 ) throw std::runtime_error("Eval point not found in the neighborhood.");
+
             a     /= a.norm();
             n      = ( Scalar(1) - avg_normal ) * n + avg_normal * a;
             n     /= n.norm();
