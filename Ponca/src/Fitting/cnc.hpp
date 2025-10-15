@@ -66,12 +66,27 @@ namespace Ponca::internal {
             return nb_vt;
         }
     };
+#define FUNC_COMPUTE_COSIN(COSIN)                                  \
+    template<typename Scalar>                                      \
+    constexpr std::array<Scalar, 6> compute_##COSIN##_values() {   \
+        std::array<Scalar, 6> result = {};                         \
+        for (int i = 0; i < 6; ++i) {                              \
+            result[i] = std::COSIN(i * M_PI / 3.0);                \
+        }                                                          \
+        return result;                                             \
+    }
+
+FUNC_COMPUTE_COSIN(cos)
+FUNC_COMPUTE_COSIN(sin)
+#undef FUNC_COMPUTE_COSIN
 
     /// Generates the triangles used by the CNC Fit using HexagramGeneration
     template <typename P>
     struct TriangleGenerator<HexagramGeneration, P> {
         using VectorType = typename P::VectorType;
         using Scalar = typename P::Scalar;
+        static constexpr auto _cos = compute_cos_values<Scalar>();
+        static constexpr auto _sin = compute_sin_values<Scalar>();
 
         template <typename PointContainer, typename IndicesGetter>
         static int generate(
@@ -85,7 +100,6 @@ namespace Ponca::internal {
             std::array< VectorType,    6 > _targets;
 
             Scalar avg_normal  = Scalar(0.5);
-            // BIN
             VectorType c = _evalPointPos;
             VectorType n = _evalPointNormal;
             VectorType a;
@@ -124,7 +138,7 @@ namespace Ponca::internal {
             for ( int i = 0 ; i < 6 ; i++ ) {
                 indices    [ i ] = -1;
                 _distance2 [ i ] = avg_d * avg_d;
-                _targets   [ i ] = avg_d * ( u * std::cos( i * M_PI / 3.0 ) + v * std::sin( i * M_PI / 3.0 ) );
+                _targets   [ i ] = avg_d * ( u * _cos[i] + v * _sin[i] );
             }
 
             // Compute closest points.
@@ -156,6 +170,8 @@ namespace Ponca::internal {
     struct TriangleGenerator<AvgHexagramGeneration, P> {
         using VectorType = typename P::VectorType;
         using Scalar = typename P::Scalar;
+        static constexpr auto _cos = compute_cos_values<Scalar>();
+        static constexpr auto _sin = compute_sin_values<Scalar>();
 
         template <typename PointContainer, typename IndicesGetter>
         static int generate(
@@ -199,15 +215,12 @@ namespace Ponca::internal {
             v /= v.norm();
 
             for (int i = 0 ; i < 6 ; i++ ) {
-                _targets[ i ]          = avg_d * ( u * std::cos( i * M_PI / 3.0 ) + v * std::sin( i * M_PI / 3.0 ) );
+                _targets[ i ]          = avg_d * ( u * _cos[i] + v * _sin[i] );
                 array_avg_normals[ i ] = VectorType::Zero();
                 array_avg_points[ i ]  = VectorType::Zero();
             }
 
             for (int index : indicesGetter) {
-                // if ( points[ index ].pos() == c )
-                //     continue;
-
                 VectorType p = points[ index ].pos() - c;
                 int best_k = 0;
                 Scalar best_d2 = ( p - _targets[ 0 ] ).squaredNorm();
@@ -233,15 +246,14 @@ namespace Ponca::internal {
                 }
             }
 
-            std::array <VectorType, 3> t1_points  = { array_avg_points[0] , array_avg_points[2] , array_avg_points[4] };
-            std::array <VectorType, 3> t1_normals = { array_avg_normals[0], array_avg_normals[2], array_avg_normals[4] };
-
-            std::array <VectorType, 3> t2_points  = { array_avg_points[1] , array_avg_points[3] , array_avg_points[5] };
-            std::array <VectorType, 3> t2_normals = { array_avg_normals[1], array_avg_normals[3], array_avg_normals[5] };
-
-            triangles.push_back(internal::Triangle<P>(t1_points, t1_normals));
-            triangles.push_back(internal::Triangle<P>(t2_points, t2_normals));
-
+            triangles.push_back(internal::Triangle<P>(
+                { array_avg_points[0] , array_avg_points[2] , array_avg_points[4] },
+                { array_avg_normals[0], array_avg_normals[2], array_avg_normals[4] }
+            ));
+            triangles.push_back(internal::Triangle<P>(
+                { array_avg_points[1] , array_avg_points[3] , array_avg_points[5] },
+                { array_avg_normals[1], array_avg_normals[3], array_avg_normals[5] }
+            ));
             return 2;
         }
     };
