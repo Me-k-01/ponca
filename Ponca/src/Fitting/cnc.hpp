@@ -110,8 +110,7 @@ namespace Ponca::internal {
     template<typename P>
     struct HexagramBase {
         using Scalar = typename P::Scalar;
-    protected:
-
+    private:
 #define FUNC_COMPUTE_COSIN(COSIN)                                         \
     template<typename Scalar>                                             \
     static constexpr std::array<Scalar, 6> compute_##COSIN##_values() {   \
@@ -124,15 +123,15 @@ namespace Ponca::internal {
         FUNC_COMPUTE_COSIN(cos)
         FUNC_COMPUTE_COSIN(sin)
 #undef FUNC_COMPUTE_COSIN
-
     public:
         static constexpr Scalar avg_normal_coef {Scalar(0.5)};
-        static constexpr auto cos = compute_cos_values<Scalar>();
-        static constexpr auto sin = compute_sin_values<Scalar>();
+        // Cos and sin values of a circle divided into six
+        static constexpr std::array<Scalar, 6> cos_values = compute_cos_values<Scalar>();
+        static constexpr std::array<Scalar, 6> sin_values = compute_sin_values<Scalar>();
     };
     /// Generates the triangles used by the CNC Fit using HexagramGeneration
     template <typename P>
-    struct TriangleGenerator<HexagramGeneration, P> : public HexagramBase<P> {
+    struct TriangleGenerator<HexagramGeneration, P> : protected HexagramBase<P> {
         using VectorType = typename P::VectorType;
         using Scalar = typename P::Scalar;
 
@@ -176,19 +175,15 @@ namespace Ponca::internal {
             u /= u.norm();
             v /= v.norm();
 
-            std::array<int, 6> indices;
-            std::array<VectorType, 3> t1_pos    {c,c,c};
-            std::array<VectorType, 3> t1_normals{n,n,n};
-            std::array<VectorType, 3> t2_pos    {c,c,c};
-            std::array<VectorType, 3> t2_normals{n,n,n};
+            std::array<VectorType, 6> positions {c,c,c,c,c,c};
+            std::array<VectorType, 6> normals   {n,n,n,n,n,n};
 
             std::array< Scalar    ,    6 > _distance2;
             std::array< VectorType,    6 > _targets;
 
             for ( int i = 0 ; i < 6 ; i++ ) {
-                indices    [ i ] = -1;
                 _distance2 [ i ] = avg_d * avg_d;
-                _targets   [ i ] = avg_d * ( u * HexagramBase<P>::cos[i] + v * HexagramBase<P>::sin[i] );
+                _targets   [ i ] = avg_d * ( u * HexagramBase<P>::cos_values[i] + v * HexagramBase<P>::sin_values[i] );
             }
 
             // Compute closest points.
@@ -199,30 +194,14 @@ namespace Ponca::internal {
                 for ( int j = 0 ; j < 6 ; j++ ){
                     const Scalar d2 = ( d - _targets[ j ]).squaredNorm();
                     if ( d2 < _distance2[ j ] ){
-                        int tri_idx;
-                        if (j%2==0) {
-                            tri_idx = j/2;
-                            t1_pos    [ tri_idx ] = p;
-                            t1_normals[ tri_idx ] = points[ index ].normal();
-                        } else {
-                            tri_idx = (j-1)/2;
-                            t2_pos    [ tri_idx ] = p;
-                            t2_normals[ tri_idx ] = points[ index ].normal();
-                        }
-                        indices   [ j ] = index;
-                        _distance2[ j ] = d2;
+                        _distance2 [ j ] = d2;
+                        positions[ j ] = p;
+                        normals  [ j ] = points[ index ].normal();
                     }
                 }
             }
-            // triangles.push_back(internal::Triangle<P>(t1_pos, t1_normals));
-            // triangles.push_back(internal::Triangle<P>(t2_pos, t2_normals));
-
-#define GET_POINT(I) indices[I]  < 0 ? _evalPointPos : points[indices[I]].pos()
-#define GET_NORMAL(I) indices[I] < 0 ? _evalPointNormal : points[indices[I]].normal()
-            triangles.push_back(internal::Triangle<P>({GET_POINT(0) , GET_POINT(2) , GET_POINT(4)}, {GET_NORMAL(0) , GET_NORMAL(2) , GET_NORMAL(4)}));
-            triangles.push_back(internal::Triangle<P>({GET_POINT(1), GET_POINT(3), GET_POINT(5)}, {GET_NORMAL(1), GET_NORMAL(3), GET_NORMAL(5)}));
-#undef GET_POINT
-#undef GET_NORMAL
+            triangles.push_back(internal::Triangle<P>({positions[0] , positions[2] , positions[4]}, {normals[0] , normals[2], normals[4]}));
+            triangles.push_back(internal::Triangle<P>({positions[1] , positions[3] , positions[5]}, {normals[1] , normals[3], normals[5]}));
 
             return 2;
         }
@@ -230,7 +209,7 @@ namespace Ponca::internal {
 
     /// Generates the triangles used by the CNC Fit using AvgHexagramGeneration
     template <typename P>
-    struct TriangleGenerator<AvgHexagramGeneration, P> : public HexagramBase<P> {
+    struct TriangleGenerator<AvgHexagramGeneration, P> : protected HexagramBase<P> {
         using VectorType = typename P::VectorType;
         using Scalar = typename P::Scalar;
 
@@ -278,7 +257,7 @@ namespace Ponca::internal {
             std::array< VectorType, 6 > array_avg_pos;
             std::array< int, 6 >    array_nb {};
             for (int i = 0 ; i < 6 ; i++ ) {
-                _targets[ i ]          = avg_d * ( u * HexagramBase<P>::cos[i] + v * HexagramBase<P>::sin[i] );
+                _targets[ i ]          = avg_d * ( u * HexagramBase<P>::cos_values[i] + v * HexagramBase<P>::sin_values[i] );
                 array_avg_normals[ i ] = VectorType::Zero();
                 array_avg_pos    [ i ] = VectorType::Zero();
             }
