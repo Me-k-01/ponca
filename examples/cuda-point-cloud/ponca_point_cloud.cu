@@ -40,13 +40,12 @@ __host__ void pointsToFlattenedArray(PointContainer & points, typename DataPoint
  * \brief Make a DataPoint from the positions and normals array
  *
  * \tparam DataPoint The DataPoint type.
- * \tparam Scalar The numeric type.
  * \param index The index of the point.
  * \param positions As an input, the flattened positions array.
  * \param normals As an input, the flattened normal array.
  */
-template<typename DataPoint, typename Scalar>
-__device__ DataPoint& makeDataPoint(const int index, Scalar * positions, Scalar * normals)
+template<typename DataPoint>
+__device__ DataPoint makeDataPoint(const int index, const typename DataPoint::Scalar * positions, const typename DataPoint::Scalar * normals)
 {
     using VectorType = typename DataPoint::VectorType;
 
@@ -56,8 +55,8 @@ __device__ DataPoint& makeDataPoint(const int index, Scalar * positions, Scalar 
     const int singleDimIndex = index * DataPoint::Dim;
     for (int d = 0; d < DataPoint::Dim; ++d)
     {
-        position[d] = positions[singleDimIndex + d];
-        normal[d]   = normals  [singleDimIndex + d];
+        position.row(d) << positions[singleDimIndex + d];
+        normal.row(d)   << normals  [singleDimIndex + d];
     }
 
     return DataPoint(position, normal);
@@ -75,7 +74,7 @@ __device__ DataPoint& makeDataPoint(const int index, Scalar * positions, Scalar 
  * \param pointsOutput As an output, an STL-like container that contains the point position and normal.
  */
 template<typename DataPoint, typename PointContainer>
-__host__ void flattenedArrayToPoints(typename DataPoint::Scalar * positions, typename DataPoint::Scalar * normals, PointContainer & pointsOutput)
+__host__ void flattenedArrayToPoints(const typename DataPoint::Scalar * positions, const typename DataPoint::Scalar * normals, PointContainer & pointsOutput)
 {
     using VectorType = typename DataPoint::VectorType;
 
@@ -87,8 +86,8 @@ __host__ void flattenedArrayToPoints(typename DataPoint::Scalar * positions, typ
         const int singleDimIndex = i*DataPoint::Dim;
         for (int d = 0; d < DataPoint::Dim; ++d)
         {
-            position[d] = positions[singleDimIndex + d];
-            normal[d]   = normals  [singleDimIndex + d];
+            position.row(d) << positions[singleDimIndex + d];
+            normal.row(d)   << normals  [singleDimIndex + d];
         }
         pointsOutput[i] = DataPoint(position, normal);
     }
@@ -105,7 +104,7 @@ __host__ void flattenedArrayToPoints(typename DataPoint::Scalar * positions, typ
  * \param nbPoints The total number of points in the point cloud.
  */
 template<typename DataPoint, typename Fit>
-__global__ void fitKernel(float* positions, float* normals, const typename DataPoint::Scalar analysisScale, const int nbPoints)
+__global__ void fitKernel(const typename DataPoint::Scalar* positions, const typename DataPoint::Scalar* normals, const typename DataPoint::Scalar analysisScale, const int nbPoints)
 {
     // Get global index
     const unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -114,11 +113,11 @@ __global__ void fitKernel(float* positions, float* normals, const typename DataP
         return;
 
     // Make the evaluation point of the fit
-    DataPoint& evalPoint = makeDataPoint<DataPoint>(i, positions, normals);
+    DataPoint evalPoint = makeDataPoint<DataPoint>(i, positions, normals);
 
     // Set up the fit
     Fit fit;
-    fit.setWeightFunc({ evalPoint.pos(), analysisScale });
+    fit.setNeighborFilter({ evalPoint.pos(), analysisScale });
 
     // Computes the fit
     fit.init();
