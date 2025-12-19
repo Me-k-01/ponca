@@ -65,6 +65,11 @@ else()
     )
 endif()
 
+if(PONCA_USE_PCH)
+    target_precompile_headers(Fitting PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/Ponca/precompiled/Fitting/fitting_pch.h
+    )
+endif()
 
 add_dependencies(Fitting Common)
 
@@ -106,10 +111,4 @@ export(EXPORT FittingTargets
 #target_sources(Fitting INTERFACE $<BUILD_INTERFACE:${ponca_INCLUDE}> )
 if( ${PONCA_GENERATE_IDE_TARGETS} )
   add_custom_target(ponca_Fitting_IDE SOURCES ${ponca_Fitting_INCLUDE})
-endif()
-
-if(PONCA_USE_PCH)
-    target_precompile_headers(Fitting PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/Ponca/precompiled/Fitting/fitting_pch.h
-    )
 endif()
