@@ -74,7 +74,11 @@ set_target_properties(Fitting PROPERTIES
 
 if(Eigen3_FOUND)
   message("Compiling with installed Eigen package, enable transitive linking (Version ${Eigen3_VERSION}, path: ${Eigen3_DIR})")
-  target_link_libraries(Fitting PUBLIC INTERFACE Eigen3::Eigen)
+  if(PONCA_USE_PCH)
+      target_link_libraries(Fitting PUBLIC Eigen3::Eigen) # Make Eigen visible for the pch
+  else()
+      target_link_libraries(Fitting PUBLIC INTERFACE Eigen3::Eigen)
+  endif()
 endif()
 
 install(TARGETS Fitting
