@@ -42,8 +42,11 @@ set(ponca_Fitting_INCLUDE
 if(PONCA_USE_PCH)
     add_library(Fitting SHARED)
     target_include_directories(Fitting
-            PUBLIC ${PONCA_src_ROOT}
-            PRIVATE ${EIGEN3_INCLUDE_DIRS}
+            PUBLIC
+                $<BUILD_INTERFACE:${PONCA_src_ROOT}>
+                $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+            PRIVATE
+                ${EIGEN3_INCLUDE_DIRS}
     )
     target_sources(Fitting
             PRIVATE
