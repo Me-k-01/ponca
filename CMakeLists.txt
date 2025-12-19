@@ -65,33 +65,19 @@ endif()
 ################################################################################
 
 find_package(Eigen3 3.4 QUIET)
-if( NOT Eigen3_FOUND )
-    message(STATUS "Cannot find Eigen, use submodule (disable transitive linking)")
 
-    if( NOT EXISTS ${EIGEN_SUBMODULE_ROOT_PATH}/signature_of_eigen3_matrix_library )
-        execute_process(COMMAND git submodule update --init -- ${EIGEN_SUBMODULE_ROOT_PATH}
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-    endif()
+if(NOT Eigen3_FOUND)
+    message(STATUS "Cannot find Eigen, using bundled submodule")
 
-    get_directory_property(hasParent PARENT_DIRECTORY)
-    if(hasParent)
-        set(EIGEN3_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen" PARENT_SCOPE)
-        message(STATUS "Make EIGEN3_INCLUDE_DIRS available to parent project.")
-    else()
-        set(EIGEN3_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen")
+    set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen")
+
+    if(NOT TARGET Eigen3::Eigen)
+        add_library(Eigen3::Eigen INTERFACE IMPORTED)
+        set_target_properties(Eigen3::Eigen PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
+        )
     endif()
-    include_directories(${EIGEN3_INCLUDE_DIRS})
 endif()
-
-macro(ponca_handle_eigen_dependency TARGETNAME)
-    ## Should be retrieved by transitive linking, however it seems to fails with older cmake versions
-    if(Eigen3_FOUND)
-        get_target_property(MODULE Fitting INTERFACE_LINK_LIBRARIES )
-        if ("${MODULE}" STREQUAL "Eigen3::Eigen")
-            target_link_libraries(${TARGETNAME} PUBLIC Eigen3::Eigen)
-        endif()
-    endif()
-endmacro()
 
 ################################################################################
 # Generate install target                                                      #

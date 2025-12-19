@@ -50,8 +50,6 @@ if(PONCA_USE_PCH)
             PUBLIC
             $<BUILD_INTERFACE:${PONCA_src_ROOT}>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-            PRIVATE
-            ${EIGEN3_INCLUDE_DIRS}
     )
 else()
     add_library(Fitting INTERFACE)
@@ -65,7 +63,10 @@ else()
     )
 endif()
 
-add_dependencies(Fitting Common)
+target_link_libraries(Fitting PUBLIC
+    Ponca::Common
+    Eigen3::Eigen
+)
 
 set_target_properties(Fitting PROPERTIES
   INTERFACE_COMPILE_FEATURES cxx_std_11

@@ -25,7 +25,8 @@ target_sources(SpatialPartitioning INTERFACE
     "$<BUILD_INTERFACE:${ponca_SpatialPartitioning_INCLUDE}>"
     "$<INSTALL_INTERFACE:>"
     )
-add_dependencies(SpatialPartitioning Common)
+
+target_link_libraries(SpatialPartitioning INTERFACE Ponca::Common)
 
 set_target_properties(SpatialPartitioning PROPERTIES
   INTERFACE_COMPILE_FEATURES cxx_std_11
