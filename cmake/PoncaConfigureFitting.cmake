@@ -41,33 +41,27 @@ set(ponca_Fitting_INCLUDE
 
 if(PONCA_USE_PCH)
     add_library(Fitting SHARED)
-    target_include_directories(Fitting
-            PUBLIC
-                $<BUILD_INTERFACE:${PONCA_src_ROOT}>
-                $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-            PRIVATE
-                ${EIGEN3_INCLUDE_DIRS}
-    )
     target_sources(Fitting
             PRIVATE
             ${ponca_Fitting_INCLUDE}
             ${PONCA_src_ROOT}/Ponca/precompiled/Fitting/fitting_pch.cpp # A cpp source file required to precompile the header in a shared lib
     )
+    target_include_directories(Fitting
+            PUBLIC
+            $<BUILD_INTERFACE:${PONCA_src_ROOT}>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+            PRIVATE
+            ${EIGEN3_INCLUDE_DIRS}
+    )
 else()
     add_library(Fitting INTERFACE)
-    target_include_directories(Fitting INTERFACE
-            "$<BUILD_INTERFACE:${PONCA_src_ROOT}>"
-            "$<INSTALL_INTERFACE:include/>"
-    )
     target_sources(Fitting INTERFACE
             "$<BUILD_INTERFACE:${ponca_Fitting_INCLUDE}>"
             "$<INSTALL_INTERFACE:>"
     )
-endif()
-
-if(PONCA_USE_PCH)
-    target_precompile_headers(Fitting PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/Ponca/precompiled/Fitting/fitting_pch.h
+    target_include_directories(Fitting INTERFACE
+            "$<BUILD_INTERFACE:${PONCA_src_ROOT}>"
+            "$<INSTALL_INTERFACE:include/>"
     )
 endif()
 
@@ -84,6 +78,12 @@ if(Eigen3_FOUND)
   else()
       target_link_libraries(Fitting PUBLIC INTERFACE Eigen3::Eigen)
   endif()
+endif()
+
+if(PONCA_USE_PCH)
+    target_precompile_headers(Fitting PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/Ponca/precompiled/Fitting/fitting_pch.h
+    )
 endif()
 
 install(TARGETS Fitting
