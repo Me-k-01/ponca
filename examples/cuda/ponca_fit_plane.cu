@@ -4,8 +4,6 @@
 #include <Ponca/src/Fitting/meanPlaneFit.h>
 #include <Ponca/src/Fitting/weightFunc.h>
 #include <Ponca/src/Fitting/weightKernel.h>
-#include <Ponca/SpatialPartitioning>
-#include <Ponca/src/SpatialPartitioning/KdTree/kdTree.h>
 #include <vector>
 
 #include "cuda_utils.cu"
@@ -22,17 +20,16 @@
  * \param analysisScale The radius of the neighborhood.
  * \param nbPoints The total number of points in the point cloud.
  * \param potentialResults As an Output, the potential results of the fit for each point of the Point Cloud.
- * \param gradiantResults As an Output, the primitiveGradient results of the fit for each point of the Point Cloud.
+ * \param gradientResults As an Output, the primitiveGradient results of the fit for each point of the Point Cloud.
  */
 template<typename DataPoint, typename Fit, typename Scalar>
-__global__ void fitPotentialKernel(
+__global__ void fitPotentialAndGradientKernel(
     const Scalar* const positions,
     const Scalar* const normals,
     const Scalar analysisScale,
     const int nbPoints,
     Scalar* const potentialResults,
-    Scalar* const gradiantResults
-
+    Scalar* const gradientResults
 ) {
     using VectorType = typename DataPoint::VectorType;
 
@@ -60,7 +57,7 @@ __global__ void fitPotentialKernel(
     if (! fit.isStable()) {
         potentialResults[i] = NAN;
         for (int d = 0; d < DataPoint::Dim; ++d) {
-            gradiantResults[i*DataPoint::Dim + d] = NAN;
+            gradientResults[i*DataPoint::Dim + d] = NAN;
         }
         return;
     }
@@ -69,7 +66,7 @@ __global__ void fitPotentialKernel(
     potentialResults[i] = fit.potential(evalPoint.pos());
     VectorType grad = fit.primitiveGradient(evalPoint.pos());
     for (int d = 0; d < DataPoint::Dim; ++d) {
-        gradiantResults[i*DataPoint::Dim + d] = grad(d);
+        gradientResults[i*DataPoint::Dim + d] = grad(d);
     }
 }
 
@@ -97,7 +94,6 @@ __host__ void testPlaneCuda( const bool _bUnoriented = false,  const bool _bAddP
     Scalar analysisScale = Scalar(15.) * std::sqrt( width * height / nbPoints);
     Scalar centerScale   = Eigen::internal::random<Scalar>(1, 10000);
     VectorType center    = VectorType::Random() * centerScale;
-
     VectorType direction = VectorType::Random().normalized();
 
     Scalar epsilon = testEpsilon<Scalar>();
@@ -113,8 +109,6 @@ __host__ void testPlaneCuda( const bool _bUnoriented = false,  const bool _bAddP
                                                      _bUnoriented);
     }
 
-    // Ponca::KdTreeDense<DataPoint> tree(vectorPoints); // TODO : pass this to the device
-
     auto scalarBufferSize = nbPoints*sizeof(Scalar);
     auto vectorBufferSize = scalarBufferSize*Dim;
 
@@ -128,8 +122,8 @@ __host__ void testPlaneCuda( const bool _bUnoriented = false,  const bool _bAddP
     Scalar* normalsDevice;
     cudaMalloc(&positionsDevice, vectorBufferSize);
     cudaMalloc(&normalsDevice  , vectorBufferSize);
-    cudaMemcpy(positionsDevice , positions, vectorBufferSize, cudaMemcpyHostToDevice);
-    cudaMemcpy(normalsDevice   , normals  , vectorBufferSize, cudaMemcpyHostToDevice);
+    cudaMemcpy( positionsDevice, positions, vectorBufferSize, cudaMemcpyHostToDevice);
+    cudaMemcpy( normalsDevice  , normals  , vectorBufferSize, cudaMemcpyHostToDevice);
 
     // Prepare output buffers
     auto *potentialResults = new Scalar[nbPoints];
@@ -145,6 +139,7 @@ __host__ void testPlaneCuda( const bool _bUnoriented = false,  const bool _bAddP
 
     // Computes the kernel
     fitPotentialKernel<DataPoint, MeanFitSmooth><<<gridSize, blockSize>>>(positionsDevice, normalsDevice, analysisScale, nbPoints, potentialResultsDevice, gradientResultsDevice);
+
     cudaDeviceSynchronize(); // Wait for the results
 
     // Fetch results (Device to Host)

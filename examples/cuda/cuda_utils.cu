@@ -1,6 +1,6 @@
 #pragma once
 
-/*! \brief Converts a STL-like container of DataPoint to flattened arrays of positions and normals (one dimension).
+/*! \brief Converts a STL-like container of DataPoint to flattened arrays of positions and normals (only one dimension).
  *
  * \tparam DataPoint The DataPoint type.
  * \tparam PointContainer A STL-like container of DataPoint.
@@ -26,22 +26,22 @@ __host__ void pointsToFlattenedArray(
 
 /*! \brief Extract a vector from a flattened array of vectors
  *
- * \tparam DataPoint The DataPoint type containing the VectorType and the number of Dimension.
- * \param idx The id of the vector that needs to be extracted (the index of the vector in the flattened array is idx * Dimension).
- * \param flattenedVectorBuffer The flattened vector array, that is of size : total number of vector * Dimension.
- * \return The vector that was extracted from the flattened vector buffer.
+ * \tparam DataPoint The DataPoint type containing the VectorType and the number of dimensions.
+ * \param idx The id of the vector that needs to be extracted (the index in the flattened array corresponds to : idx * number of dimensions).
+ * \param flattenedVectorArray The flattened vector array, that is of size : total number of vector * Dimension.
+ * \return The vector that was extracted from the flattened vector array.
  */
 template <typename DataPoint>
 __host__ __device__ typename DataPoint::VectorType extractVectorFromFlattenedArray(
     const int idx,
-    const typename DataPoint::Scalar * const flattenedVectorBuffer
+    const typename DataPoint::Scalar * const flattenedVectorArray
 ) {
     using VectorType = typename DataPoint::VectorType;
     const int singleDimIndex = idx * DataPoint::Dim;
     VectorType v;
 
     for (int d = 0; d < DataPoint::Dim; ++d) {
-        v.row(d) << flattenedVectorBuffer[singleDimIndex + d];
+        v.row(d) << flattenedVectorArray[singleDimIndex + d];
     }
 
     return v;
@@ -50,20 +50,20 @@ __host__ __device__ typename DataPoint::VectorType extractVectorFromFlattenedArr
 /*! \brief Make a DataPoint from the positions and normals flattened array
  *
  * \tparam DataPoint The DataPoint type containing the VectorType and the number of Dimension.
- * \param index The index of the point that needs to be extracted from the flattened arrays.
+ * \param idx The id of the vector that needs to be extracted (the index in the flattened array corresponds to : idx * number of dimensions).
  * \param positions As an input, the flattened positions array.
  * \param normals As an input, the flattened normal array.
  */
 template<typename DataPoint>
 __host__ __device__ DataPoint makeDataPoint(
-    const int index,
+    const int idx,
     const typename DataPoint::Scalar * const positions,
     const typename DataPoint::Scalar * const normals
 ) {
     using VectorType = typename DataPoint::VectorType;
 
-    VectorType position = extractVectorFromFlattenedArray<DataPoint>(index, positions);
-    VectorType normal   = extractVectorFromFlattenedArray<DataPoint>(index, normals);
+    VectorType position = extractVectorFromFlattenedArray<DataPoint>(idx, positions);
+    VectorType normal   = extractVectorFromFlattenedArray<DataPoint>(idx, normals);
 
     return DataPoint(position, normal);
 }
