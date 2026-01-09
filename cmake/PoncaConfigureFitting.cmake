@@ -51,6 +51,7 @@ if(PONCA_USE_PCH)
             $<BUILD_INTERFACE:${PONCA_src_ROOT}>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
+    target_link_libraries(Fitting PUBLIC Ponca::Common Eigen3::Eigen)
 else()
     add_library(Fitting INTERFACE)
     target_sources(Fitting INTERFACE
@@ -61,25 +62,17 @@ else()
             "$<BUILD_INTERFACE:${PONCA_src_ROOT}>"
             "$<INSTALL_INTERFACE:include/>"
     )
+    add_dependencies(Fitting Common)
+    if(Eigen3_FOUND)
+        message("Compiling with installed Eigen package, enable transitive linking (Version ${Eigen3_VERSION}, path: ${Eigen3_DIR})")
+        target_link_libraries(Fitting PUBLIC INTERFACE Eigen3::Eigen)
+    endif()
 endif()
-
-target_link_libraries(Fitting PUBLIC
-    Ponca::Common
-    Eigen3::Eigen
-)
 
 set_target_properties(Fitting PROPERTIES
   INTERFACE_COMPILE_FEATURES cxx_std_11
 )
 
-if(Eigen3_FOUND)
-  message("Compiling with installed Eigen package, enable transitive linking (Version ${Eigen3_VERSION}, path: ${Eigen3_DIR})")
-  if(PONCA_USE_PCH)
-      target_link_libraries(Fitting PUBLIC Eigen3::Eigen) # Make Eigen visible for the pch
-  else()
-      target_link_libraries(Fitting PUBLIC INTERFACE Eigen3::Eigen)
-  endif()
-endif()
 
 if(PONCA_USE_PCH)
     target_precompile_headers(Fitting PRIVATE

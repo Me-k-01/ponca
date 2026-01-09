@@ -10,7 +10,7 @@ OPTION( PONCA_CONFIGURE_EXAMPLES   "Include compilation rules for built-in examp
 OPTION( PONCA_CONFIGURE_DOC        "Include compilation rules for built-in documentation" ON)
 OPTION( PONCA_CONFIGURE_TESTS      "Include compilation rules for built-in tests"         ON)
 OPTION( PONCA_GENERATE_IDE_TARGETS "Generate targets to show source files in IDEs"        ON)
-OPTION( PONCA_USE_PCH              "Build as SHARED library and use precompiled headers"  ON)
+OPTION( PONCA_USE_PCH              "Build as SHARED library and use precompiled headers"  OFF)
 
 ##
 ## END USER OPTIONS
@@ -72,10 +72,14 @@ if(NOT Eigen3_FOUND)
     set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen")
 
     if(NOT TARGET Eigen3::Eigen)
-        add_library(Eigen3::Eigen INTERFACE IMPORTED)
-        set_target_properties(Eigen3::Eigen PROPERTIES
-                INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
-        )
+        if(PONCA_USE_PCH)
+            add_library(Eigen3::Eigen INTERFACE IMPORTED)
+            set_target_properties(Eigen3::Eigen PROPERTIES
+                    INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
+            )
+        else()
+            add_library(Eigen3::Eigen SHARED IMPORTED)
+        endif()
     endif()
 endif()
 

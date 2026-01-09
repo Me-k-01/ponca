@@ -2,7 +2,6 @@
 #include <Ponca/Fitting>
 #include "tests/common/testUtils.h"
 
-using namespace std;
 using namespace Ponca;
 
 typedef PointPositionNormal<float, 3> Point;
