@@ -24,17 +24,9 @@ PONCA_MULTIARCH typename DataPoint::VectorType extractVectorFromFlattenedArray(
     return v;
 }
 
-/*!
- * \brief Variant of the MyPoint class allowing to work with external raw data.
- *
- * Using this approach, one can use the Ponca library with already existing
- * data-structures without any data-duplication.
- *
- * In this example, we use this class to map an interlaced raw array containing
- * both point normals and coordinates.
- */
+//! \brief The Point data type that holds a reference to an external interlaced array of normal and positions.
 template<typename _Scalar, int _Dim>
-class PointRef
+class PointReference
 {
 public:
     enum {Dim = _Dim};
@@ -42,14 +34,42 @@ public:
     typedef Eigen::Matrix<Scalar, Dim, 1>   VectorType;
     typedef Eigen::Matrix<Scalar, Dim, Dim> MatrixType;
 
-    PONCA_MULTIARCH inline PointRef(Scalar* _interlacedArray, int _pId)
-        : m_pos (Eigen::Map< const VectorType >(_interlacedArray + Dim*2*_pId  )),
-        m_normal(Eigen::Map< const VectorType >(_interlacedArray + Dim*2*_pId+Dim))
+    PONCA_MULTIARCH inline PointReference(Scalar* _interlacedArray, const int _pId)
+        : m_interlacedArray (_interlacedArray),
+        m_id(_pId)
     {}
 
-    PONCA_MULTIARCH inline const Eigen::Map< const VectorType >& pos()    const { return m_pos; }
-    PONCA_MULTIARCH inline const Eigen::Map< const VectorType >& normal() const { return m_normal; }
+    PONCA_MULTIARCH inline void bind(Scalar* _interlacedArray) {
+        m_interlacedArray = _interlacedArray;
+    }
+
+    PONCA_MULTIARCH inline Eigen::Map< const VectorType > pos()    const { return Eigen::Map< const VectorType >(m_interlacedArray + Dim*2*m_id); }
+    PONCA_MULTIARCH inline Eigen::Map< const VectorType > normal() const { return Eigen::Map< const VectorType >(m_interlacedArray + Dim*2*m_id+Dim); }
 
 private:
-    Eigen::Map< const VectorType > m_pos, m_normal;
+    Scalar * m_interlacedArray;
+    const int m_id;
 };
+
+/*! \brief Kernel that binds each point buffer to the interlaced buffer of positions and normals in the Device.
+ *
+ * \tparam DataPoint The DataPoint type.
+ * \tparam Scalar A scalar type (float, double...)
+ * \param points The point cloud (needs to be bind to the interlacedArray on the device).
+ * \param interlacedArray The interlaced buffer of positions and normals.
+ * \param nbPoints The total number of points in the point cloud.
+ */
+template<typename DataPoint, typename Scalar>
+__global__ void bindPointsKernel(
+    DataPoint* points,
+    Scalar* interlacedArray,
+    const int nbPoints
+) {
+    // Get global index
+    const unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
+
+    // Skip when not in the point cloud
+    if (i >= nbPoints) return;
+
+    points[i].bind(interlacedArray);
+}
