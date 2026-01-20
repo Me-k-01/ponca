@@ -4,30 +4,28 @@
 #include <Ponca/src/Fitting/meanPlaneFit.h>
 #include <Ponca/src/Fitting/weightFunc.h>
 #include <Ponca/src/Fitting/weightKernel.h>
-#include <vector>
+#include <iostream>
 
 #include "cuda_utils.cu"
-#include "../../tests/common/testing.h"
 #include "../../tests/common/testUtils.h"
 
 
-/*! \brief Computes a fit for each point of the point cloud and returns the potential result.
+/*!
+ * \brief Computes a fit for each point of the point cloud and returns the potential result.
  *
  * \tparam DataPoint The DataPoint type.
  * \tparam Fit The Fit that will be computed by the Kernel.
- * \param positions As an Input, the array of positions of the point cloud.
- * \param normals As an Input, the array of normals of the point cloud.
- * \param analysisScale The radius of the neighborhood.
+ * \param interlacedArray As an Input, the array of positions and normal of the point cloud.
  * \param nbPoints The total number of points in the point cloud.
+ * \param analysisScale The radius of the neighborhood.
  * \param potentialResults As an Output, the potential results of the fit for each point of the Point Cloud.
  * \param gradientResults As an Output, the primitiveGradient results of the fit for each point of the Point Cloud.
  */
 template<typename DataPoint, typename Fit, typename Scalar>
 __global__ void fitPotentialAndGradientKernel(
-    const Scalar* const positions,
-    const Scalar* const normals,
-    const Scalar analysisScale,
+    Scalar* interlacedArray,
     const int nbPoints,
+    const Scalar analysisScale,
     Scalar* const potentialResults,
     Scalar* const gradientResults
 ) {
@@ -40,7 +38,7 @@ __global__ void fitPotentialAndGradientKernel(
     if (i >= nbPoints) return;
 
     // Make the evaluation point of the fit
-    const auto evalPoint = makeDataPoint<DataPoint>(i, positions, normals);
+    const auto evalPoint = DataPoint(interlacedArray, i);
 
     // Set up the fit
     Fit fit;
@@ -49,7 +47,7 @@ __global__ void fitPotentialAndGradientKernel(
     // Computes the fit
     fit.init();
     for (int j = 0; j < nbPoints; ++j) {
-        fit.addNeighbor( makeDataPoint<DataPoint>(j, positions, normals) );
+        fit.addNeighbor( DataPoint(interlacedArray, j) );
     }
     fit.finalize();
 
@@ -70,60 +68,56 @@ __global__ void fitPotentialAndGradientKernel(
     }
 }
 
-/*! \brief Test a MeanPlaneFit on a plane using the CUDA kernel
+/*!
+ * \brief Test a MeanPlaneFit on a plane using the CUDA kernel
  *
- * \tparam Scalar The scalar type (e.g. double, float, long double...)
+ * \tparam Scalar The scalar type (e.g. double, float or long double...)
  * \tparam Dim The number of dimension that the VectorType will have.
  * \param _bUnoriented Generates an unoriented point cloud.
- * \param _bAddPositionNoise Determines if we add a randomly generated offset to the posion.
+ * \param _bAddPositionNoise Determines if we add a randomly generated offset to the position.
  * \param _bAddNormalNoise Determines if we add a randomly generated offset to the normal.
  */
 template<typename Scalar, int Dim>
-__host__ void testPlaneCuda( const bool _bUnoriented = false,  const bool _bAddPositionNoise = false,  const bool _bAddNormalNoise = false)
-{
-    typedef PointPositionNormal<Scalar, Dim> DataPoint;
+__host__ void testPlaneCuda(
+    const bool _bUnoriented       = false,
+    const bool _bAddPositionNoise = false,
+    const bool _bAddNormalNoise   = false
+) {
+    typedef PointRef<Scalar, Dim> DataPoint;
     typedef Ponca::DistWeightFunc<DataPoint, Ponca::SmoothWeightKernel<Scalar> > WeightSmoothFunc;
     typedef Ponca::Basket<DataPoint, WeightSmoothFunc, Ponca::MeanPlaneFit> MeanFitSmooth;
     typedef typename DataPoint::VectorType VectorType;
 
-    int nbPoints = Eigen::internal::random<int>(100, 1000);
+    const int nbPoints = Eigen::internal::random<int>(100, 1000);
+    const Scalar width  = Eigen::internal::random<Scalar>(1., 10.);
+    const Scalar height = width;
+    const Scalar analysisScale = Scalar(15.) * std::sqrt( width * height / nbPoints);
+    const Scalar centerScale   = Eigen::internal::random<Scalar>(1, 10000);
+    const VectorType center    = VectorType::Random() * centerScale;
+    const VectorType direction = VectorType::Random().normalized();
 
-    Scalar width  = Eigen::internal::random<Scalar>(1., 10.);
-    Scalar height = width;
+    const unsigned long scalarBufferSize     = nbPoints * sizeof(Scalar);
+    const unsigned long vectorBufferSize     = scalarBufferSize * Dim;
+    const unsigned long interlacedBufferSize = vectorBufferSize * 2;
 
-    Scalar analysisScale = Scalar(15.) * std::sqrt( width * height / nbPoints);
-    Scalar centerScale   = Eigen::internal::random<Scalar>(1, 10000);
-    VectorType center    = VectorType::Random() * centerScale;
-    VectorType direction = VectorType::Random().normalized();
+    // Interlaced point positions and normals
+    Scalar interlacedArray[nbPoints * Dim * 2];
 
-    Scalar epsilon = testEpsilon<Scalar>();
-    std::vector<DataPoint> vectorPoints(nbPoints);
-
-    for(unsigned int i = 0; i < vectorPoints.size(); ++i)
-    {
-        vectorPoints[i] = getPointOnPlane<DataPoint>(center,
-                                                     direction,
-                                                     width,
-                                                     _bAddPositionNoise,
-                                                     _bAddNormalNoise,
-                                                     _bUnoriented);
+    for(unsigned int i = 0; i < nbPoints; ++i) {
+        auto point = getPointOnPlane<PointPositionNormal<Scalar, Dim>>(
+            center, direction, width,
+            _bAddPositionNoise, _bAddNormalNoise, _bUnoriented
+        );
+        for (int d = 0; d<Dim; ++d) {
+            interlacedArray[i * Dim * 2 + d]       = point.pos()[d];
+            interlacedArray[i * Dim * 2 + d + Dim] = point.normal()[d];
+        }
     }
 
-    auto scalarBufferSize = nbPoints*sizeof(Scalar);
-    auto vectorBufferSize = scalarBufferSize*Dim;
-
-    // Convert point vector to flattened arrays
-    Scalar positions[nbPoints*Dim];
-    Scalar normals  [nbPoints*Dim];
-    pointsToFlattenedArray<DataPoint>(vectorPoints, positions, normals);
-
     // Send inputs to the device
-    Scalar* positionsDevice;
-    Scalar* normalsDevice;
-    cudaMalloc(&positionsDevice, vectorBufferSize);
-    cudaMalloc(&normalsDevice  , vectorBufferSize);
-    cudaMemcpy( positionsDevice, positions, vectorBufferSize, cudaMemcpyHostToDevice);
-    cudaMemcpy( normalsDevice  , normals  , vectorBufferSize, cudaMemcpyHostToDevice);
+    Scalar* interlacedArrayDevice;
+    cudaMalloc( &interlacedArrayDevice, interlacedBufferSize );
+    cudaMemcpy( interlacedArrayDevice, interlacedArray, interlacedBufferSize, cudaMemcpyHostToDevice);
 
     // Prepare output buffers
     auto *potentialResults = new Scalar[nbPoints];
@@ -133,31 +127,38 @@ __host__ void testPlaneCuda( const bool _bUnoriented = false,  const bool _bAddP
     cudaMalloc(&potentialResultsDevice, scalarBufferSize);
     cudaMalloc(&gradientResultsDevice , vectorBufferSize);
 
-    int blockSize = 128;
-    // The grid size needed, based on input size
-    int gridSize = (nbPoints + blockSize - 1) / blockSize;
+    // Set block and grid size depending on number of points
+    constexpr int blockSize = 128;
+    const int gridSize = (nbPoints + blockSize - 1) / blockSize;
 
     // Computes the kernel
-    fitPotentialKernel<DataPoint, MeanFitSmooth><<<gridSize, blockSize>>>(positionsDevice, normalsDevice, analysisScale, nbPoints, potentialResultsDevice, gradientResultsDevice);
+    fitPotentialAndGradientKernel<DataPoint, MeanFitSmooth><<<gridSize, blockSize>>>(
+        interlacedArrayDevice, nbPoints, analysisScale, potentialResultsDevice, gradientResultsDevice
+    );
 
-    cudaDeviceSynchronize(); // Wait for the results
+    // Wait for every thread to finish
+    cudaDeviceSynchronize();
 
     // Fetch results (Device to Host)
     cudaMemcpy(potentialResults, potentialResultsDevice, scalarBufferSize, cudaMemcpyDeviceToHost);
     cudaMemcpy(gradientResults , gradientResultsDevice , vectorBufferSize, cudaMemcpyDeviceToHost);
 
     // Free CUDA memory
-    cudaFree(positionsDevice);
-    cudaFree(normalsDevice);
+    cudaFree(interlacedArrayDevice);
     cudaFree(potentialResultsDevice);
     cudaFree(gradientResultsDevice);
 
+    // Validate results
+    const Scalar epsilon = testEpsilon<Scalar>();
     for (int j = 0; j < nbPoints; ++j) {
-        VectorType primGrad = extractVectorFromFlattenedArray<DataPoint>(j, gradientResults);
+        const VectorType primGrad = extractVectorFromFlattenedArray<DataPoint>(j, gradientResults);
         std::cout << "j:" << j << ", potential:"<< potentialResults[j] << ", ";
         std::cout << "primitiveGradient:" << primGrad.transpose() << " ; " << std::endl;
-        VERIFY(std::abs(potentialResults[j]) <= epsilon);
-        VERIFY(Scalar(1.) - std::abs(primGrad.dot(direction)) <= epsilon);
+
+        if (std::abs(potentialResults[j]) > epsilon || Scalar(1.) - std::abs(primGrad.dot(direction)) > epsilon) {
+            std::cerr << "Test  failed in " << __FILE__ << " (" << __LINE__ << ")" << std::endl;
+            abort();
+        }
     }
 
     delete[] potentialResults;
@@ -165,10 +166,8 @@ __host__ void testPlaneCuda( const bool _bUnoriented = false,  const bool _bAddP
 }
 
 
-__host__ int main(int argc, char** argv) {
-    if(!init_testing(argc, argv))
-        return EXIT_FAILURE;
-
+__host__ int main(const int /*argc*/, char** /*argv*/) {
     std::cout << "Test plane fitting on cuda..." << std::endl;
     testPlaneCuda<float, 3>();
+    std::cout << "(ok)" << std::endl;
 }
