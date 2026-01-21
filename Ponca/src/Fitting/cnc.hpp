@@ -10,8 +10,6 @@ All rights reserved.
 #pragma once
 
 #include <random>
-#include "boundedRange.h"
-#include <Ponca/src/Fitting/weightFunc.h>
 
 namespace Ponca::internal {
     /*! \internal
@@ -340,7 +338,9 @@ namespace Ponca {
     template <typename PointContainer>
     FIT_RESULT CNC<P, M>::compute( const PointContainer& points ) {
         init();
-        internal::BoundedIntRange indicesSample( points.size() );
+        std::vector<unsigned int> indicesSample(points.size());
+        std::iota(indicesSample.begin(), indicesSample.end(), 0);
+
         m_eCurrentState = internal::TriangleGenerator<M, P>::generate( indicesSample, points, m_nFilter, m_triangles);
         if (m_eCurrentState != STABLE) return m_eCurrentState;
         m_nb_vt = m_triangles.size();
