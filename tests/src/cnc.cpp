@@ -95,7 +95,7 @@ void testBasicFunctionalities(
         // Sample the neighbors
         std::vector<int> pointsIndex;
         pointsIndex.push_back(i);
-        for (int j : tree.range_neighbors(i, analysisScale)) {
+        for (int j : tree.rangeNeighbors(i, analysisScale)) {
             pointsIndex.push_back(j);
         }
 
@@ -148,14 +148,14 @@ void testCompareFit(
         pointsIndex.push_back(i);
 
         if constexpr (orderedByDistance) {
-            for (int j : tree.k_nearest_neighbors(i, vectorPoints.size())) {
+            for (int j : tree.kNearestNeighbors(i, vectorPoints.size())) {
                 // Stops when we go past the analysis scale
                 if (w(vectorPoints[ j ]).first == Scalar(0.))
                     break;
                 pointsIndex.push_back(j);
             }
         } else {
-            for (const int j : tree.range_neighbors(i, analysisScale)) {
+            for (const int j : tree.rangeNeighbors(i, analysisScale)) {
                 pointsIndex.push_back(j);
             }
         }
