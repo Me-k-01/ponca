@@ -127,4 +127,5 @@ int main()
     // any data duplication
     Fit fit;
     test_fit(fit, interlacedArray, n, p);
+    delete[] interlacedArray;
 }
