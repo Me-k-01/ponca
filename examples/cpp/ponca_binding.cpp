@@ -94,7 +94,7 @@ void test_fit(Fit& _fit,
 // Build an interlaced array containing _n position and normal vectors
 Scalar* buildInterlacedArray(int _n)
 {
-    Scalar* interlacedArray = new Scalar[uint8_t(2*DIMENSION*_n)];
+    auto* interlacedArray = new Scalar[2*DIMENSION*_n];
 
     for(int k=0; k<_n; ++k)
     {
