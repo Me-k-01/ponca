@@ -24,33 +24,6 @@ PONCA_MULTIARCH typename DataPoint::VectorType extractVectorFromFlattenedArray(
     return v;
 }
 
-//! \brief The Point data type that holds a reference to an external interlaced array of normal and positions.
-template<typename _Scalar, int _Dim>
-class PointReference
-{
-public:
-    enum {Dim = _Dim};
-    typedef _Scalar Scalar;
-    typedef Eigen::Matrix<Scalar, Dim, 1>   VectorType;
-    typedef Eigen::Matrix<Scalar, Dim, Dim> MatrixType;
-
-    PONCA_MULTIARCH inline PointReference(Scalar* _interlacedArray, const int _pId)
-        : m_interlacedArray (_interlacedArray),
-        m_id(_pId)
-    {}
-
-    PONCA_MULTIARCH inline void bind(Scalar* _interlacedArray) {
-        m_interlacedArray = _interlacedArray;
-    }
-
-    PONCA_MULTIARCH inline Eigen::Map< const VectorType > pos()    const { return Eigen::Map< const VectorType >(m_interlacedArray + Dim*2*m_id); }
-    PONCA_MULTIARCH inline Eigen::Map< const VectorType > normal() const { return Eigen::Map< const VectorType >(m_interlacedArray + Dim*2*m_id+Dim); }
-
-private:
-    Scalar * m_interlacedArray;
-    const int m_id;
-};
-
 /*! \brief Kernel that binds each point buffer to the interlaced buffer of positions and normals in the Device.
  *
  * \tparam DataPoint The DataPoint type.

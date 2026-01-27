@@ -3,11 +3,11 @@
 #include <Ponca/src/Fitting/meanPlaneFit.h>
 #include <Ponca/src/Fitting/weightFunc.h>
 #include <Ponca/src/Fitting/weightKernel.h>
+#include <Ponca/src/Common/pointTypes.h>
+#include <Ponca/src/Common/pointGeneration.h>
 #include <iostream>
 
 #include "cuda_utils.cu"
-#include "../../tests/common/testUtils.h"
-
 
 /*! \brief Computes the fitting process for each point of the point cloud and returns the potential and primitive gradient result.
  *
@@ -79,7 +79,7 @@ __host__ void testPlaneCuda(
     const bool _bAddPositionNoise = false,
     const bool _bAddNormalNoise   = false
 ) {
-    typedef PointReference<Scalar, Dim> DataPoint;
+    typedef Ponca::PointPositionNormalLateBinding<Scalar, Dim> DataPoint;
     typedef Ponca::DistWeightFunc<DataPoint, Ponca::SmoothWeightKernel<Scalar> > WeightSmoothFunc;
     typedef Ponca::Basket<DataPoint, WeightSmoothFunc, Ponca::MeanPlaneFit> MeanFitSmooth;
     typedef typename DataPoint::VectorType VectorType;
@@ -103,7 +103,7 @@ __host__ void testPlaneCuda(
     auto* interlacedArray = new Scalar[nbPoints * Dim * 2];
 
     for(unsigned int i = 0; i < nbPoints; ++i) {
-        auto point = getPointOnPlane<PointPositionNormal<Scalar, Dim>>(
+        auto point = Ponca::getPointOnPlane<Ponca::PointPositionNormal<Scalar, Dim>>(
             center, direction, width,
             _bAddPositionNoise, _bAddNormalNoise, _bUnoriented
         );
@@ -161,7 +161,7 @@ __host__ void testPlaneCuda(
     cudaFree(gradientResultsDevice);
 
     // Validate results
-    const Scalar epsilon = testEpsilon<Scalar>();
+    const auto epsilon = Scalar(0.001);
     for (int j = 0; j < nbPoints; ++j) {
         const VectorType primGrad = extractVectorFromFlattenedArray<DataPoint>(j, gradientResults);
         std::cout << "j:" << j << ", potential:"<< potentialResults[j] << ", ";

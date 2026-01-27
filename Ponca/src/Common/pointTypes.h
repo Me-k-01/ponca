@@ -93,4 +93,47 @@ namespace Ponca {
     private:
         Eigen::Map< const VectorType > m_pos, m_normal;
     };
+    // [PointPositionNormalBinding]
+
+
+    // [PointPositionNormalLateBinding]
+    /*! \copybrief PointPositionNormalBinding
+     *
+     * We use this class to map an interlaced raw array containing
+     * both point normals and coordinates.
+     *
+     * Similar to \ref PointPositionNormalBinding, but the binding is done
+     * when the getter functions `pos()` and `normal()` are called.
+     *
+     * \see PointPositionNormal
+     */
+    template<typename _Scalar, int _Dim>
+    class PointPositionNormalLateBinding
+    {
+    public:
+        enum {Dim = _Dim};
+        typedef _Scalar Scalar;
+        typedef Eigen::Matrix<Scalar, Dim, 1>   VectorType;
+        typedef Eigen::Matrix<Scalar, Dim, Dim> MatrixType;
+
+        PONCA_MULTIARCH inline PointPositionNormalLateBinding(Scalar* _interlacedArray, const int _pId)
+            : m_interlacedArray (_interlacedArray),
+            m_id(_pId)
+        {}
+
+        //! \brief Allows change of reference
+        PONCA_MULTIARCH inline void bind(Scalar* _interlacedArray) {
+            m_interlacedArray = _interlacedArray;
+        }
+
+        //! \copybrief PointPositionNormal::pos
+        PONCA_MULTIARCH [[nodiscard]] inline Eigen::Map< const VectorType > pos()    const { return Eigen::Map< const VectorType >(m_interlacedArray + Dim*2*m_id); }
+        //! \copybrief PointPositionNormal::normal
+        PONCA_MULTIARCH [[nodiscard]] inline Eigen::Map< const VectorType > normal() const { return Eigen::Map< const VectorType >(m_interlacedArray + Dim*2*m_id+Dim); }
+
+    private:
+        Scalar * m_interlacedArray;
+        const int m_id;
+    };
+    // [PointPositionNormalLateBinding]
 }
