@@ -173,34 +173,6 @@ void generateData(std::vector<DataPoint>& points) {
 	std::generate(points.begin(), points.end(), []() { return DataPoint(VectorType::Random()); });
 }
 
-
-// Build an interlaced array containing _n position and normal vectors
-template<typename DataPoint>
-typename DataPoint::Scalar * generateDataAsInterlacedArray(std::vector<DataPoint>& points)
-{
-	using VectorType         = typename DataPoint::VectorType;
-	using Scalar             = typename DataPoint::Scalar;
-	constexpr auto DIMENSION = DataPoint::Dim;
-	const int n_points       = points.size();
-	auto* interlacedArray    = new Scalar[2*DIMENSION*n_points];
-
-	for(int i=0; i<n_points; ++i)
-	{
-		// We use Eigen Vectors to compute both coordinates and normals,
-		// and then copy the raw values to an interlaced array.
-		VectorType n = VectorType::Random().normalized();
-		VectorType p = VectorType::Random();
-
-		// Grab coordinates and store them as raw buffer
-		memcpy(interlacedArray+2*DIMENSION*i,           p.data(), DIMENSION*sizeof(Scalar));
-		memcpy(interlacedArray+2*DIMENSION*i+DIMENSION, n.data(), DIMENSION*sizeof(Scalar));
-
-		points.emplace_back(interlacedArray, i);
-	}
-
-	return interlacedArray;
-}
-
 // For subsampling
 template<typename DataPoint>
 std::unique_ptr<Ponca::KdTreeSparse<DataPoint>> buildSubsampledKdTree(std::vector<DataPoint>& points, std::vector<int>& sampling) {
