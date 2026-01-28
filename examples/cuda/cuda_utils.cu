@@ -1,27 +1,10 @@
 #pragma once
 
-/*!
- * \brief Extract a vector from a flattened array of vectors
- *
- * \tparam DataPoint The DataPoint type containing the VectorType and the number of dimensions.
- * \param idx The id of the vector that needs to be extracted (the index in the flattened array corresponds to : idx * number of dimensions).
- * \param flattenedVectorArray The flattened vector array, that is of size : total number of vector * Dimension.
- * \return The vector that was extracted from the flattened vector array.
- */
-template <typename DataPoint>
-PONCA_MULTIARCH typename DataPoint::VectorType extractVectorFromFlattenedArray(
-    const int idx,
-    const typename DataPoint::Scalar * const flattenedVectorArray
-) {
-    using VectorType = typename DataPoint::VectorType;
-    const int singleDimIndex = idx * DataPoint::Dim;
-    VectorType v;
-
-    for (int d = 0; d < DataPoint::Dim; ++d) {
-        v.row(d) << flattenedVectorArray[singleDimIndex + d];
-    }
-
-    return v;
+#define CUDA_CHECK(err) \
+    if (err != cudaSuccess) { \
+    std::cerr << "CUDA error: " << cudaGetErrorString(err) \
+    << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+    abort(); \
 }
 
 /*! \brief Kernel that binds each point buffer to the interlaced buffer of positions and normals in the Device.
