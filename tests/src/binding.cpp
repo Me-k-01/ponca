@@ -67,10 +67,10 @@ typename DataPoint::Scalar generateData(vector<DataPoint>& points)
 template<typename DataPoint, typename DataPointRef>
 typename DataPoint::Scalar * copyDataRef(std::vector<DataPoint>& points, std::vector<DataPointRef>& pointsBinding)
 {
-    static_assert(DataPoint::Dim == DataPointRef::Dim, "Both dimension should be the same");
+    constexpr int DIMENSION =  DataPoint::Dim;
+    static_assert(DIMENSION == DataPointRef::Dim, "Both dimension should be the same");
     using VectorType         = typename DataPoint::VectorType;
     using Scalar             = typename DataPoint::Scalar;
-    constexpr auto DIMENSION = DataPoint::Dim;
     const int nPoints        = points.size();
     auto* interlacedArray    = new Scalar[2*DIMENSION*nPoints];
     pointsBinding.reserve(nPoints);
@@ -106,9 +106,10 @@ typename DataPoint::Scalar * copyDataRef(std::vector<DataPoint>& points, std::ve
 template<template<typename> typename Fit, typename DataPoint1, typename DataPoint2, typename CompareFitFunctor>
 void compareDataPointOnFit( std::vector<DataPoint1>& points1, std::vector<DataPoint2>& points2, typename DataPoint1::Scalar analysisScale, CompareFitFunctor compareFit)
 {
-    static_assert( DataPoint1::Dim == DataPoint2::Dim, "Both dimension should be the same" );
+    constexpr int  DIMENSION =  DataPoint1::Dim;
+    static_assert( DIMENSION == DataPoint2::Dim, "Both dimension should be the same" );
     static_assert( std::is_same_v<typename DataPoint1::Scalar, typename DataPoint2::Scalar>, "Both scalar type should be the same" );
-    PONCA_DEBUG_ASSERT_MSG( points1.size() == points2.size(), "Both size should be the same" );
+    PONCA_ASSERT_MSG( points1.size() == points2.size(), "Both size should be the same" );
 
     KdTreeDense<DataPoint1> tree1(points1);
     KdTreeDense<DataPoint2> tree2(points2);
@@ -131,8 +132,7 @@ void compareDataPointOnFit( std::vector<DataPoint1>& points1, std::vector<DataPo
         auto neighborhoodRange2 = tree2.rangeNeighbors(points2[i].pos(), analysisScale);
         f2.computeWithIds( neighborhoodRange2, points2 );
 
-        // VERIFY((compareFit(f1, f2)));
-        compareFit(f1, f2);
+        VERIFY((compareFit(f1, f2)));
     }
 }
 
@@ -154,17 +154,17 @@ void callSubTests()
     std::vector<PointRef> pointsRef;
     for(int i = 0; i < g_repeat; ++i)
     {
-        const Scalar analysisScale    = generateData(points);
+        const Scalar  analysisScale   = generateData(points);
         const Scalar* interlacedArray = copyDataRef(points, pointsRef);
 
         // Compare fits
-        CALL_SUBTEST((compareDataPointOnFit<SphereFit>(points, pointsRef, analysisScale, [](auto& f1, auto& f2){
+        CALL_SUBTEST((compareDataPointOnFit<SphereFit>(points, pointsRef, analysisScale, [](const auto& f1, const auto& f2){
             // Both fitting result should be the same
-            // const Scalar epsilon          = Eigen::NumTraits<Scalar>::dummy_precision();
-            // const Scalar squaredEpsilon   = epsilon*epsilon;
-            std::pow(f1.m_uc - f2.m_uc, Scalar(2)) < Eigen::NumTraits<Scalar>::dummy_precision()*Eigen::NumTraits<Scalar>::dummy_precision() &&
-            std::pow(f1.m_uq - f2.m_uq, Scalar(2)) < Eigen::NumTraits<Scalar>::dummy_precision()*Eigen::NumTraits<Scalar>::dummy_precision() &&
-            f1.m_ul.isApprox(f2.m_ul);
+            const Scalar eps        = Eigen::NumTraits<Scalar>::dummy_precision();
+            const Scalar squaredEps = eps * eps;
+            return std::pow(f1.m_uc - f2.m_uc, Scalar(2)) < squaredEps
+                && std::pow(f1.m_uq - f2.m_uq, Scalar(2)) < squaredEps
+                && f1.m_ul.isApprox(f2.m_ul);
         })));
 
         points.clear();
@@ -173,7 +173,7 @@ void callSubTests()
     }
 }
 
-int main(int argc, char** argv)
+int main(const int argc, char** argv)
 {
     if(!init_testing(argc, argv))
     {
