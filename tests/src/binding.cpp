@@ -112,7 +112,10 @@ void compareDataPointOnFit( std::vector<DataPoint1>& points1, std::vector<DataPo
     PONCA_ASSERT_MSG( points1.size() == points2.size(), "Both size should be the same" );
 
     KdTreeDense<DataPoint1> tree1(points1);
-    KdTreeDense<DataPoint2> tree2(points2);
+    KdTreeDense<DataPoint2> tree2;
+    tree2.build(std::forward<std::vector<DataPoint2>>(points2), [](auto&& inputPointContainer, auto& internalPointContainer) {
+        internalPointContainer = std::forward<decltype(inputPointContainer)>(inputPointContainer);
+    });
 
     // Quick testing is requested for coverage
     const int nPoint = QUICK_TESTS ? 1 : int(points1.size());
