@@ -109,7 +109,7 @@ void compareDataPointOnFit( std::vector<DataPoint1>& points1, std::vector<DataPo
     constexpr int  DIMENSION =  DataPoint1::Dim;
     static_assert( DIMENSION == DataPoint2::Dim, "Both dimension should be the same" );
     static_assert( std::is_same_v<typename DataPoint1::Scalar, typename DataPoint2::Scalar>, "Both scalar type should be the same" );
-    PONCA_ASSERT_MSG( points1.size() == points2.size(), "Both size should be the same" );
+    VERIFY( points1.size() == points2.size() );
 
     KdTreeDense<DataPoint1> tree1(points1);
     KdTreeDense<DataPoint2> tree2;
