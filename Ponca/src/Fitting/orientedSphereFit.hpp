@@ -66,6 +66,8 @@ OrientedSphereFitImpl<DataPoint, _NFilter, T>::finalize ()
             return Base::m_eCurrentState = UNDEFINED;
         // Plane
         Scalar s   = Scalar(1.) / Base::m_ul.norm();
+        std::cout << "WARNING degenerate case with :" << std::endl;
+        std::cout << " - m_deno : " << m_deno << " < " << "eps * max(m_sumDotPP, den1)) : " << epsilon * max(m_sumDotPP, den1) << std::endl;
         Base::m_ul = s*Base::m_ul;
         Base::m_uc = s*Base::m_uc;
         Base::m_uq = Scalar(0.);

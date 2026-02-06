@@ -66,13 +66,12 @@ typename DataPoint::Scalar generateData(vector<DataPoint>& points)
 template<typename DataPoint, typename... DataPointRef>
 typename DataPoint::Scalar * copyDataRef(std::vector<DataPoint>& points, std::vector<DataPointRef>&... pointsBinding)
 {
-    constexpr int DIMENSION     =  DataPoint::Dim;
-    // static_assert(DIMENSION    == DataPointRef::Dim, "Both dimension should be the same");
+    constexpr int DIM     =  DataPoint::Dim;
     using VectorType            = typename DataPoint::VectorType;
     using Scalar                = typename DataPoint::Scalar;
 
-    const int nPoints           = points.size();
-    auto* const interlacedArray = new Scalar[2*DIMENSION*nPoints];
+    const int nPoints           = int(points.size());
+    auto* const interlacedArray = new Scalar[2*DIM*nPoints];
     (pointsBinding.reserve(nPoints), ...);
 
     for(int i=0; i<nPoints; ++i)
@@ -83,8 +82,8 @@ typename DataPoint::Scalar * copyDataRef(std::vector<DataPoint>& points, std::ve
         VectorType p = points[i].pos();
 
         // Grab coordinates and store them as raw buffer
-        memcpy(interlacedArray+2*DIMENSION*i          , p.data(), DIMENSION*sizeof(Scalar));
-        memcpy(interlacedArray+2*DIMENSION*i+DIMENSION, n.data(), DIMENSION*sizeof(Scalar));
+        memcpy(interlacedArray+2*DIM*i    , p.data(), DIM*sizeof(Scalar));
+        memcpy(interlacedArray+2*DIM*i+DIM, n.data(), DIM*sizeof(Scalar));
 
         (pointsBinding.emplace_back(interlacedArray, i), ...);
     }
@@ -92,27 +91,27 @@ typename DataPoint::Scalar * copyDataRef(std::vector<DataPoint>& points, std::ve
     return interlacedArray;
 }
 
-/*! \brief Compares the fit results between two point data type.
+/*! \brief Verify that the fit results between two point data types are the same. The points are passed through an spatial partitioning structure
  *
- * The fit is computed for each point of the point cloud.
+ * The fit is computed for each point of the point cloud. The results are compared using the `fit.isApprox` method
  *
- * \param kdtree1 A kdtree containing the first set of data point
- * \param kdtree2 A kdtree containing the first set of data point that we are comparing to the first
+ * \tparam Fit A fit class that performs the fitting over the neighborhood
+ * \tparam SpatialStruct1 The first Spatial partitioning structure containing a rangeNeighbors method (e.g. \ref KdTree or \ref KnnGraph)
+ * \tparam SpatialStruct2 The second Spatial partitioning structure containing a rangeNeighbors method (e.g. \ref KdTree or \ref KnnGraph)
+ * \param spatialStruct1 A spatial partitioning structure containing the first set of data point
+ * \param spatialStruct2 A spatial partitioning structure the first set of data point that we are comparing to the first
  * \param analysisScale The radius of the neighborhood for the fitting process
- * \param compareFit A functor that does a comparison on the computed fits.
  */
-template<template<typename> typename Fit, typename KdTree1, typename KdTree2, typename CompareFitFunctor>
-void compareKdTreeWithFit( KdTree1& kdtree1, KdTree2& kdtree2, typename KdTree1::DataPoint::Scalar analysisScale, CompareFitFunctor compareFit)
+template<template<typename> typename Fit, typename SpatialStruct1, typename SpatialStruct2>
+void compareFitOverPointTypes( SpatialStruct1& spatialStruct1, SpatialStruct2& spatialStruct2, typename SpatialStruct2::DataPoint::Scalar analysisScale)
 {
-    using DataPoint1          = typename KdTree1::DataPoint;
-    using DataPoint2          = typename KdTree2::DataPoint;
+    using DataPoint1          = typename SpatialStruct1::DataPoint;
+    using DataPoint2          = typename SpatialStruct2::DataPoint;
     constexpr int  DIMENSION  = DataPoint1::Dim;
     static_assert( DIMENSION == DataPoint2::Dim, "Both dimension should be the same" );
     static_assert( std::is_same_v<typename DataPoint1::Scalar, typename DataPoint2::Scalar>, "Both scalar type should be the same" );
-
-    const std::vector<DataPoint1>& points1 = kdtree1.points();
-    const std::vector<DataPoint2>& points2 = kdtree2.points();
-
+    const std::vector<DataPoint1>& points1 = spatialStruct1.points();
+    const std::vector<DataPoint2>& points2 = spatialStruct2.points();
     VERIFY( points1.size() == points2.size() );
 
     // Quick testing is requested for coverage
@@ -125,15 +124,25 @@ void compareKdTreeWithFit( KdTree1& kdtree1, KdTree2& kdtree2, typename KdTree1:
     {
         Fit<DataPoint1> f1;
         f1.setNeighborFilter({points1[i].pos(), analysisScale});
-        auto neighborhoodRange1 = kdtree1.rangeNeighbors(points1[i].pos(), analysisScale);
+        const auto neighborhoodRange1 = spatialStruct1.rangeNeighbors(points1[i].pos(), analysisScale);
         f1.computeWithIds( neighborhoodRange1, points1 );
 
         Fit<DataPoint2> f2;
         f2.setNeighborFilter({points2[i].pos(), analysisScale});
-        auto neighborhoodRange2 = kdtree2.rangeNeighbors(points2[i].pos(), analysisScale);
+        const auto neighborhoodRange2 = spatialStruct2.rangeNeighbors(points2[i].pos(), analysisScale);
         f2.computeWithIds( neighborhoodRange2, points2 );
 
-        VERIFY((compareFit(f1, f2)));
+        if (!f1.isApprox(f2)) {
+            std::cout << "------------------------" << std::endl;
+            std::cout << "f1.m_uc : " << f1.m_uc << " ;    f2.m_uc : " << f2.m_uc << std::endl;
+            std::cout << "f1.m_uq : " << f1.m_uq << " ;    f2.m_uq : " << f2.m_uq << std::endl;
+            std::cout << "f1.m_ul : " << f1.m_ul.transpose() << std::endl;
+            std::cout << "f2.m_ul : " << f2.m_ul.transpose() << std::endl;
+            std::cout << "------------------------" << std::endl;
+        }
+
+        VERIFY(f1.isApprox(f2));
+        VERIFY(f2.isApprox(f1));
     }
 }
 
@@ -164,9 +173,6 @@ void callSubTests()
     typedef PointPositionNormalBinding<Scalar, Dim> PointRef;
     typedef PointPositionNormalLateBinding<Scalar, Dim> PointLateRef;
 
-#ifdef NDEBUG
-#pragma omp parallel for
-#endif
     for(int i = 0; i < g_repeat; ++i)
     {
         // Points to compare
@@ -183,14 +189,10 @@ void callSubTests()
         KdTreeDense<PointLateRef> kdtreeLateRef(pointsLateRef);
 
         // Compare fits made with the kdtree
-        CALL_SUBTEST((compareKdTreeWithFit<TestSphereFit>(
-            kdtree, kdtreeRef, analysisScale, sphereFitAreEquals<Point, PointRef>
-        )));
-        CALL_SUBTEST((compareKdTreeWithFit<TestSphereFit>(
-            kdtree, kdtreeLateRef, analysisScale, sphereFitAreEquals<Point, PointLateRef>
-        )));
+        CALL_SUBTEST((compareFitOverPointTypes<TestSphereFit>(kdtree, kdtreeRef, analysisScale)));
+        CALL_SUBTEST((compareFitOverPointTypes<TestSphereFit>(kdtree, kdtreeLateRef, analysisScale)));
 
-        // Clear buffer before next pass
+        // Delete buffer before the next pass
         delete[] interlacedArray;
     }
 }
