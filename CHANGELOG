@@ -6,11 +6,14 @@ Current head (v.2.0.alpha1 RC)
 
 - API
     - [spatialPartitioning] Add mutable query and rename query functions (#105)
-    - [common] Add point types and point generation methods (#248)
+    - [common] Add point types and point generation methods (#248, #220)
 
 - Bug-fixes and code improvements
     - [fitting] Fix broken include directives in Basket/Compute (#236)
     - [fitting] Reduce code coverage misses (#246)
+
+- Cmake
+    - [examples] Change folder layout of CUDA examples (#220)
 
 - Tests
     - [all] Speed up tests in coverage mode (#236)
@@ -19,6 +22,7 @@ Current head (v.2.0.alpha1 RC)
 - Examples
     - [nanoflann] Fix broken include directives (#236)
     - [common] Use common point type and point generation methods (#248)
+    - [examples] Add a CUDA example for 3D point clouds (#220)
 
 - CI/Actions
     - Add coverage report for Pull Requests (#236, #245, #245)
@@ -27,6 +31,7 @@ Current head (v.2.0.alpha1 RC)
 
 - Docs
     - [doc] Add doc for Query and Iterator objects and fix syntax (#105)
+    - [doc] Update common doc to include Point data types and generation methods (#220)
 
 --------------------------------------------------------------------------------
 v.2.0.alpha0
