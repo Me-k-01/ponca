@@ -22,7 +22,7 @@
 template<typename DataPoint, typename Fit, typename Scalar>
 __global__ void fitPotentialAndGradientKernel(
     DataPoint* points,
-    const int nbPoints,
+    const unsigned int nbPoints,
     const Scalar analysisScale,
     Scalar* const potentialResults,
     Scalar* const gradientResults
@@ -79,54 +79,38 @@ __host__ void testPlaneCuda(
     const bool _bAddPositionNoise = false,
     const bool _bAddNormalNoise   = false
 ) {
-    typedef Ponca::PointPositionNormalLateBinding<Scalar, Dim> DataPoint;
+    typedef Ponca::PointPositionNormal<Scalar, Dim> DataPoint;
     typedef Ponca::DistWeightFunc<DataPoint, Ponca::SmoothWeightKernel<Scalar> > WeightSmoothFunc;
     typedef Ponca::Basket<DataPoint, WeightSmoothFunc, Ponca::MeanPlaneFit> MeanFitSmooth;
     typedef typename DataPoint::VectorType VectorType;
 
     // Point cloud parameters for the plane
-    const int nbPoints  = Eigen::internal::random<int>(100, 1000);
-    const Scalar width  = Eigen::internal::random<Scalar>(1., 10.);
-    const Scalar height = width;
-    const Scalar analysisScale = Scalar(15.) * std::sqrt( width * height / nbPoints);
-    const Scalar centerScale   = Eigen::internal::random<Scalar>(1, 10000);
-    const VectorType center    = VectorType::Random() * centerScale;
-    const VectorType direction = VectorType::Random().normalized();
+    const unsigned int nbPoints = Eigen::internal::random<int>(100, 1000);
+    const Scalar width          = Eigen::internal::random<Scalar>(1., 10.);
+    const Scalar height         = width;
+    const Scalar analysisScale  = Scalar(15.) * std::sqrt( width * height / nbPoints);
+    const Scalar centerScale    = Eigen::internal::random<Scalar>(1, 10000);
+    const VectorType center     = VectorType::Random() * centerScale;
+    const VectorType direction  = VectorType::Random().normalized();
 
     // The size of the data we send between Host and Device
     const unsigned long pointBufferSize      = nbPoints * sizeof(DataPoint);
     const unsigned long scalarBufferSize     = nbPoints * sizeof(Scalar);
     const unsigned long vectorBufferSize     = scalarBufferSize * Dim;
-    const unsigned long interlacedBufferSize = vectorBufferSize * 2;
 
     // Interlaced array of position and normal values
-    auto* const interlacedArray = new Scalar[nbPoints * Dim * 2];
+    std::vector<DataPoint> points(nbPoints);
 
     for(unsigned int i = 0; i < nbPoints; ++i) {
-        auto point = Ponca::getPointOnPlane<Ponca::PointPositionNormal<Scalar, Dim>>(
+        points[i] = Ponca::getPointOnPlane<DataPoint>(
             center, direction, width,
             _bAddPositionNoise, _bAddNormalNoise, _bUnoriented
         );
-        // Fill the interlaced array with the positions and normals.
-        for (int d = 0; d<Dim; ++d) {
-            interlacedArray[i * Dim * 2 + d]       = point.pos()(d);
-            interlacedArray[i * Dim * 2 + d + Dim] = point.normal()(d);
-        }
-    }
-
-    // Make a point buffer linking to the interlaced array
-    std::vector<DataPoint> points;
-    points.reserve(nbPoints);
-    for (int i = 0; i < nbPoints; ++i) {
-        points.emplace_back(interlacedArray, i);
     }
 
     // Send inputs to the GPU (Host to Device)
-    Scalar* interlacedArrayDevice;
     DataPoint* pointsDevice;
-    CUDA_CHECK(cudaMalloc( &interlacedArrayDevice, interlacedBufferSize ));
     CUDA_CHECK(cudaMalloc( &pointsDevice, pointBufferSize ));
-    CUDA_CHECK(cudaMemcpy( interlacedArrayDevice, interlacedArray, interlacedBufferSize, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy( pointsDevice, points.data(), pointBufferSize, cudaMemcpyHostToDevice));
 
     // Prepare output buffers
@@ -141,10 +125,6 @@ __host__ void testPlaneCuda(
     constexpr int blockSize = 128;
     const int gridSize      = (nbPoints + blockSize - 1) / blockSize;
 
-    // Binds the points to their internal values on the device
-    bindPointsKernel<DataPoint><<<gridSize, blockSize>>>(pointsDevice, interlacedArrayDevice, nbPoints);
-    CUDA_CHECK(cudaDeviceSynchronize());
-
     // Compute the fitting in the kernel
     fitPotentialAndGradientKernel<DataPoint, MeanFitSmooth><<<gridSize, blockSize>>>(
         pointsDevice, nbPoints, analysisScale, potentialResultsDevice, gradientResultsDevice
@@ -157,7 +137,6 @@ __host__ void testPlaneCuda(
 
     // Free CUDA memory
     CUDA_CHECK(cudaFree(pointsDevice));
-    CUDA_CHECK(cudaFree(interlacedArrayDevice));
     CUDA_CHECK(cudaFree(potentialResultsDevice));
     CUDA_CHECK(cudaFree(gradientResultsDevice));
 
@@ -176,11 +155,9 @@ __host__ void testPlaneCuda(
         }
     }
 
-    delete[] interlacedArray;
     delete[] potentialResults;
     delete[] gradientResults;
 }
-
 
 __host__ int main(const int /*argc*/, char** /*argv*/) {
     std::cout << "Test plane fitting on CUDA..." << std::endl;
