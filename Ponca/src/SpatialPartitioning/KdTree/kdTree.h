@@ -208,7 +208,7 @@ namespace Ponca
         //! \brief Get the number of nodes in the KdTree
         PONCA_MULTIARCH [[nodiscard]] inline NodeIndexType nodeCount() const
         {
-                  return (NodeIndexType)m_bufs.nodes_size;
+            return (NodeIndexType)m_bufs.nodes_size;
         }
 
         //! \brief Get the number of indices
